@@ -42,17 +42,20 @@ struct ScannerView: View {
     let icon_shadow_radius = CGFloat(4)
     let icon_pedding = CGFloat(4)
     
+    // Global vars
+    @EnvironmentObject var appState: AppState
+    let enableDebug: Bool = AppConfig.isDebug
     
-    
-    @State private var capturedImage: UIImage?
+    @State private var capturedImage: UIImage? 
     //@State private var capturedImage: UIImage? = UIImage(named: "test_strip")
     @State private var barResult: [BarResult] = []
+    @State var debugInfo = AnalyzerDebug()
     @State private var showCamera = false
     
     var body: some View {
         VStack(spacing: self.v_stack_spacing) {
             Group {
-                // Display the scanned image
+                // if image captured, display the scanned image and result
                 if let uiImage = self.capturedImage {
                     Image(uiImage: uiImage)
                         .resizable()
@@ -63,10 +66,48 @@ struct ScannerView: View {
                         .overlay(RoundedRectangle(cornerRadius: self.standard_corner_radius)
                             .stroke(.gray.opacity(self.standard_opacity), lineWidth: self.overlay_line_width)
                         )
-                        //.padding(.top, 0)
                     
+                    // Result display
+                    VStack(alignment: .leading, spacing: self.h_stack_spacing) {
+                        if enableDebug && !debugInfo.stages.isEmpty {
+                            ScrollView {
+                                ForEach(debugInfo.stages) { stage in
+                                    VStack(alignment: .leading) {
+                                        Text(stage.label)
+                                            .font(.caption)
+                                        Image(uiImage: stage.image)
+                                            .resizable()
+                                            .scaledToFit()
+                                    }
+                                    .padding(.bottom, 12)
+                                }
+                            }.frame(height: 150)
+                        }
                         
-                } else {
+                        Text("Results")
+                            .font(.headline)
+                            .padding(.horizontal)
+
+                        if !self.barResult.isEmpty {
+                            List(self.barResult) { bar in
+                                HStack {
+                                    Text("Bar \(bar.index)")
+                                    Spacer()
+                                    Text(String(format: "Color Intensity: %.2f", bar.intensity))
+                                    
+                                    Rectangle()
+                                        .fill(Color(bar.color))
+                                        .frame(width: self.bar_frame_width, height: self.bar_frame_height)
+                                        .clipShape(RoundedRectangle(cornerRadius: self.standard_corner_radius))
+                                }
+                            }
+                            .listStyle(.plain)
+                        }
+                    }
+                    .frame(maxWidth: self.results_frame_max_width, maxHeight: self.results_frame_max_height)
+                    
+                        //.padding(.top, 0)
+                } else { // if image not captured, display the instruction frame
                     ZStack {
                         RoundedRectangle(cornerRadius: self.standard_corner_radius)
                             .stroke(.orange, style: StrokeStyle(lineWidth: self.frame_line_width, dash: [self.frame_dash_segment]))
@@ -86,31 +127,7 @@ struct ScannerView: View {
             //.padding(.horizontal)
             
             
-            // Result display
-            if capturedImage != nil {
-                VStack(alignment: .leading, spacing: self.h_stack_spacing) {
-                    Text("Results")
-                        .font(.headline)
-                        .padding(.horizontal)
-                    
-                    if !self.barResult.isEmpty {
-                        List(self.barResult) { bar in
-                            HStack {
-                                Text("Bar \(bar.index)")
-                                Spacer()
-                                Text(String(format: "Color Intensity: %.2f", bar.intensity))
-                                
-                                Rectangle()
-                                    .fill(Color(bar.color))
-                                    .frame(width: self.bar_frame_width, height: self.bar_frame_height)
-                                    .clipShape(RoundedRectangle(cornerRadius: self.standard_corner_radius))
-                            }
-                        }
-                        .listStyle(.plain)
-                    }
-                }
-                .frame(maxWidth: self.results_frame_max_width, maxHeight: self.results_frame_max_height)
-            }
+
             
             
             // Shutter Button
@@ -136,7 +153,7 @@ struct ScannerView: View {
         .sheet(isPresented: $showCamera) {
             ImagePicker(image: $capturedImage) {
                  if let img = capturedImage {
-                    self.barResult = analyzeStrip(image: img)
+                     self.barResult = analyzeStrip(image: img, debug: debugInfo)
                 }
             }
             Text("Image Picker")

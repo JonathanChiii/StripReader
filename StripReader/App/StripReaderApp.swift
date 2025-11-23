@@ -9,6 +9,8 @@ import SwiftUI
 
 @main
 struct StripReaderApp: App {
+    @StateObject var appState = AppState()
+    
     var body: some Scene {
         WindowGroup {
             RootView()
