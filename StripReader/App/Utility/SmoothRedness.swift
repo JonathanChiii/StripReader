@@ -1,5 +1,5 @@
 //
-//  SmoothBrightness.swift
+//  SmoothRedness.swift
 //  StripReader
 //
 //  Created by jOnAtHaN Chi on 11/19/25.
