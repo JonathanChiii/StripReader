@@ -31,7 +31,7 @@ func analyzeBarColors(from cgImage: CGImage, regions: [BarRegion]) -> [BarResult
         var sumB: CGFloat = 0
         var count: Int = 0
 
-        for x in region.startX...region.endX {
+        for x in region.start...region.end {
             for y in 0..<height {
                 let offset = y * bytesPerRow + x * bytesPerPixel
 

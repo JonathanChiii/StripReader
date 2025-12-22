@@ -46,11 +46,13 @@ struct ScannerView: View {
     @EnvironmentObject var appState: AppState
     let enableDebug: Bool = AppConfig.isDebug
     
-    @State private var capturedImage: UIImage? 
+    @State private var capturedImage: UIImage?
     //@State private var capturedImage: UIImage? = UIImage(named: "test_strip")
     @State private var barResult: [BarResult] = []
     @State var debugInfo = AnalyzerDebug()
     @State private var showCamera = false
+    //@StateObject private var cameraService = CameraService()
+
     
     var body: some View {
         VStack(spacing: self.v_stack_spacing) {
@@ -81,7 +83,8 @@ struct ScannerView: View {
                                     }
                                     .padding(.bottom, 12)
                                 }
-                            }.frame(height: 150)
+                            }
+                            .frame(height: 200)
                         }
                         
                         Text("Results")
@@ -152,8 +155,19 @@ struct ScannerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .sheet(isPresented: $showCamera) {
             ImagePicker(image: $capturedImage) {
-                 if let img = capturedImage {
-                     self.barResult = analyzeStrip(image: img, debug: debugInfo)
+
+                if let img = capturedImage {
+                    
+                    // Reset previous results
+                    barResult = []
+                    debugInfo.reset()
+
+                    // Call the Vision-based analyzer
+                    analyzeStrip(image: img, debug: debugInfo) { results in
+                        DispatchQueue.main.async {
+                            self.barResult = results
+                        }
+                    }
                 }
             }
             Text("Image Picker")

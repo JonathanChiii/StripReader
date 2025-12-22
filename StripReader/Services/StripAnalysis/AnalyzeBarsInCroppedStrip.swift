@@ -1,5 +1,5 @@
 //
-//  StripAnalysis.swift
+//  AnalyzeBarsInCroppedStrip.swift
 //  StripReader
 //
 //  Created by jOnAtHaN Chi on 11/16/25.
@@ -8,67 +8,149 @@
 import Foundation
 import CoreGraphics
 import SwiftUI
+func analyzeBarsInCroppedStrip(cgImage: CGImage, debug: AnalyzerDebug? = nil) -> [BarResult] {
 
-func analyzeStrip(image: UIImage, debug: AnalyzerDebug? = nil) -> [BarResult] {
-    
-    
-    debug?.reset()
-    //debug?.add(label: "Input Image", image: image)
-    // 1. Crop center band
-    guard let band = cropCenterBand(from: image) else {
-        print("Failed to crop center band")
-        return []
-    }
-    // Debug output
-    let bandUIImage = uiImage(from: band)
-    debug?.add(label: "Center Band Crop", image: bandUIImage)
+    debug?.add(label: "Input to Pink Analyzer", image: UIImage(cgImage: cgImage))
 
-    
-    
-    // 2. Extract brightness values column by column
-    let redness = computeColumnRedness(from: band)
-    // Convert brightness values → graph image
-    if let graphImage = brightnessGraphImage(values: redness) {
-            debug?.add(label: "Redness Graph", image: graphImage)
-        }
-    
-    
-    // 3. Smooth redness (moving average)
-    let smoothedRedness = smooth(redness, windowSize: 5)
-    if let smoothGraph = brightnessGraphImage(values: smoothedRedness) {
-            debug?.add(label: "Smoothed Brightness", image: smoothGraph)
-        }
+    // 1. Compute redness per column (pink signal)
+    let redValues = computeColumnBrightness(from: cgImage)
 
-    let regions = detectRedBarRegions(
-        values: smoothedRedness,
-        rednessThreshold: 30,
-        minWidth: 4
+    debug?.add(label: "Raw Redness Graph", image:rednessGraphImage(redValues))
+
+    // 2. Smooth the graph to remove noise
+    let smoothValues = smooth(redValues)
+
+    debug?.add(label: "Smoothed Redness Graph", image: rednessGraphImage(smoothValues))
+
+    // 3. Detect pink bar regions
+    let regions = detectRedBarRegions(from: smoothValues)
+
+    // Optional debug overlay
+    debug?.add(label: "Redness Graph + Regions",
+               image: drawRegionsOnGraph(values: smoothValues, regions: regions)
     )
-    
-    // Debug image showing detected segments as vertical bars
-    if let maskImage = barMaskImage(size: CGSize(width: band.width, height: band.height),
-                                    regions: regions) {
-        debug?.add(label: "Detected Bar Mask", image: maskImage)
+
+    // 4. Produce BarResult entries
+    var results: [BarResult] = []
+
+    for (i, region) in regions.enumerated() {
+        let intensity = averageIntensity(values: smoothValues, in: region.range)
+        let uiColor = UIColor(red: CGFloat(intensity), green: 0.4, blue: 0.6, alpha: 1.0)
+
+        results.append(BarResult(index: i + 1,
+                                 intensity: CGFloat(intensity),
+                                 color: uiColor))
     }
-    
-    
-    // 5. Compute average color & intensity for each region
-    let bars = analyzeBarColors(from: band, regions: regions)
-    
-    // 6. Crop each bar region & add to debug
-        for region in regions {
-            if let cropped = cropBarRegion(from: band, region: region) {
-                debug?.add(label: "Bar \(region.startX)-\(region.endX)", image: cropped)
-            }
-        }
-    
-    
-    return bars
+
+    return results
 }
+
+//func analyzeBarsInCroppedStrip(cgImage: CGImage,
+//                               debug: AnalyzerDebug? = nil) -> [BarResult] {
+//
+//    // Convert to UIImage for debugging
+//    debug?.add(label: "Final Cropped Analysis Region", image: UIImage(cgImage: cgImage))
+//
+//    // 1. Compute redness signal
+//    let redness = computeColumnRedness(from: cgImage)
+//    debug?.add(label: "Raw Rednes Graph", image: rednessGraphImage(redness))
+//
+//    // 2. Smooth
+//    let smoothed = smooth(redness, windowSize: 5)
+//
+//    debug?.add(label: "Smoothed Redness Graph", image: rednessGraphImage(smoothed))
+//
+//    // 3. Detect red bar regions
+//    let regions = detectRedBarRegions(values: smoothed,
+//                                      rednessThreshold: 30,  // tuned for your strip
+//                                      minWidth: 4)
+//
+//    // Debug mask
+//    if let mask = barMaskImage(size: CGSize(width: cgImage.width,
+//                                            height: cgImage.height),
+//                               regions: regions) {
+//        debug?.add(label: "Detected Bar Regions Mask", image: mask)
+//    }
+//
+//    // 4. Compute bar colors
+//    let results = analyzeBarColors(from: cgImage, regions: regions)
+//
+//    // Debug: crop and show each bar region
+//    for (i, region) in regions.enumerated() {
+//        if let cropped = cropBarRegion(from: cgImage, region: region) {
+//            debug?.add(label: "Bar #\(i+1) Crop", image: cropped)
+//        }
+//    }
+//
+//    return results
+//}
+func averageIntensity(values: [CGFloat], in region: ClosedRange<Int>) -> CGFloat {
+    let slice = values[region]
+    let sum = slice.reduce(0, +)
+    return sum / CGFloat(slice.count)
+}
+
+func drawRegionsOnGraph(values: [CGFloat],
+                        regions: [BarRegion]) -> UIImage {
+
+    let base = rednessGraphImage(values)
+    let size = base.size
+
+    UIGraphicsBeginImageContext(size)
+    base.draw(at: .zero)
+
+    let ctx = UIGraphicsGetCurrentContext()!
+    ctx.setStrokeColor(UIColor.green.withAlphaComponent(0.7).cgColor)
+    ctx.setLineWidth(2)
+
+    for region in regions {
+        let lower = region.range.lowerBound
+        let upper = region.range.upperBound
+
+        ctx.move(to: CGPoint(x: CGFloat(lower), y: 0))
+        ctx.addLine(to: CGPoint(x: CGFloat(lower), y: size.height))
+
+        ctx.move(to: CGPoint(x: CGFloat(upper), y: 0))
+        ctx.addLine(to: CGPoint(x: CGFloat(upper), y: size.height))
+    }
+
+    ctx.strokePath()
+
+    let final = UIGraphicsGetImageFromCurrentImageContext()
+    UIGraphicsEndImageContext()
+    return final ?? base
+}
+
 
 func uiImage(from cgImage: CGImage) -> UIImage {
     return UIImage(cgImage: cgImage)
 }
+
+func rednessGraphImage(_ values: [CGFloat]) -> UIImage {
+    let graphHeight: CGFloat = 200
+    let size = CGSize(width: CGFloat(values.count), height: graphHeight)
+
+    UIGraphicsBeginImageContext(size)
+    guard let ctx = UIGraphicsGetCurrentContext() else { return UIImage() }
+
+    ctx.setStrokeColor(UIColor.red.cgColor)
+    ctx.setLineWidth(1.0)
+
+    for x in 0..<values.count {
+        let value = max(0, min(values[x], 1)) // clamp 0-1
+        let y = graphHeight * (1 - value)
+        ctx.move(to: CGPoint(x: CGFloat(x), y: graphHeight))
+        ctx.addLine(to: CGPoint(x: CGFloat(x), y: y))
+    }
+
+    ctx.strokePath()
+
+    let img = UIGraphicsGetImageFromCurrentImageContext()
+    UIGraphicsEndImageContext()
+
+    return img ?? UIImage()
+}
+
 
 func brightnessGraphImage(values: [CGFloat]) -> UIImage? {
     let width = values.count
@@ -108,9 +190,9 @@ func barMaskImage(size: CGSize, regions: [BarRegion]) -> UIImage? {
     ctx.setFillColor(UIColor.red.withAlphaComponent(0.5).cgColor)
 
     for region in regions {
-        let rect = CGRect(x: region.startX,
+        let rect = CGRect(x: region.start,
                           y: 0,
-                          width: region.endX - region.startX,
+                          width: region.end - region.start,
                           height: height)
         ctx.fill(rect)
     }
@@ -122,8 +204,8 @@ func barMaskImage(size: CGSize, regions: [BarRegion]) -> UIImage? {
 
 
 func cropBarRegion(from cgImage: CGImage, region: BarRegion) -> UIImage? {
-    let rect = CGRect(x: region.startX, y: 0,
-                      width: region.endX - region.startX,
+    let rect = CGRect(x: region.start, y: 0,
+                      width: region.end - region.start,
                       height: cgImage.height)
 
     if let cropped = cgImage.cropping(to: rect) {
@@ -131,3 +213,5 @@ func cropBarRegion(from cgImage: CGImage, region: BarRegion) -> UIImage? {
     }
     return nil
 }
+
+

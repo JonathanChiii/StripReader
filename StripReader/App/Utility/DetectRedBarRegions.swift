@@ -8,40 +8,49 @@
 import Foundation
 
 struct BarRegion {
-    let startX: Int
-    let endX: Int
+    let index: Int
+    let start: Int
+    let end: Int
+    var range: ClosedRange<Int> {
+            return start...end
+        }
 }
 
-func detectRedBarRegions(values: [CGFloat],
-                         rednessThreshold: CGFloat = 30,
-                         minWidth: Int = 4) -> [BarRegion] {
+func detectRedBarRegions(from values: [CGFloat]) -> [BarRegion] {
+    // Compute mean & standard deviation
+    let mean = values.reduce(0, +) / CGFloat(values.count)
+    let variance = values.map { pow($0 - mean, 2) }.reduce(0, +) / CGFloat(values.count)
+    let std = sqrt(variance)
+
+    // Dynamic threshold
+    let threshold = mean - std * 0.6
+    
+    
+    print("mean:", mean, "std:", std, "threshold:", threshold)
 
     var regions: [BarRegion] = []
-    var inBar = false
-    var start = 0
+    var start: Int? = nil
 
-    for x in 0..<values.count {
-        let isBar = values[x] > rednessThreshold
-
-        if isBar && !inBar {
-            inBar = true
-            start = x
-        }
-        else if !isBar && inBar {
-            inBar = false
-            let width = x - start
-            if width >= minWidth {
-                regions.append(BarRegion(startX: start, endX: x - 1))
+    for i in 0..<values.count {
+        if values[i] < threshold {
+            if start == nil { start = i }
+        } else if let s = start {
+            let end = i - 1
+            if end - s >= 20 {  // minimum width filter
+                regions.append(BarRegion(index: regions.count + 1, start: s, end: i))
             }
+            start = nil
         }
     }
 
-    if inBar {
-        let width = values.count - start
-        if width >= minWidth {
-            regions.append(BarRegion(startX: start, endX: values.count - 1))
-        }
-    }
+//    if let s = start {
+//        regions.append(BarRegion(index: regions.count + 1,
+//                                 start: s,
+//                                 end: values.count - 1))
+//    }
 
-    return regions
+    // Remove noise spikes
+    print("bar regions: \(regions)")
+    return regions.filter { $0.end - $0.start > 3 }
 }
+

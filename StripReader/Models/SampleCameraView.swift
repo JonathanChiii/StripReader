@@ -97,7 +97,7 @@ struct ScannerViewSample: View {
         .sheet(isPresented: $showCamera) {
             ImagePicker(image: $capturedImage) {
                 if let img = capturedImage {
-                    barResults = analyzeStrip(image: img)
+                    //barResults = analyzeStrip(image: img)
                 }
             }
             Text("Image Picker")

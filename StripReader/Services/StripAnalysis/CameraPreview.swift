@@ -1,8 +1,26 @@
+////
+////  CameraPreview.swift
+////  StripReader
+////
+////  Created by jOnAtHaN Chi on 11/23/25.
+////
 //
-//  CameraPreview.swift
-//  StripReader
+//import Foundation
+//import SwiftUI
+//import AVFoundation
 //
-//  Created by jOnAtHaN Chi on 11/23/25.
+//struct CameraPreview: UIViewRepresentable {
+//    let cameraService: CameraService
 //
-
-import Foundation
+//    func makeUIView(context: Context) -> UIView {
+//        let view = UIView()
+//
+//        let layer = cameraService.makePreviewLayer()
+//        layer.frame = UIScreen.main.bounds
+//        view.layer.addSublayer(layer)
+//
+//        return view
+//    }
+//
+//    func updateUIView(_ uiView: UIView, context: Context) {}
+//}
