@@ -150,7 +150,7 @@ struct ScannerView: View {
             guard let inputCGImage else { return }
             
             // Convert to UIImage ONLY if you need UI display
-            let uiImage = UIImage(cgImage: inputCGImage)
+            let uiImage = UIImage(cgImage: inputCGImage, scale: UIScreen.main.scale, orientation: .right)
             self.capturedImage = uiImage
 
             // Reset previous results
