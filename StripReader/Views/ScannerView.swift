@@ -146,11 +146,11 @@ struct ScannerView: View {
             }
             .padding(.bottom, self.icon_pedding)
         }
-        .onReceive(cameraService.$capturedImage) { cg in
-            guard let cg else { return }
+        .onReceive(cameraService.$capturedImage) { inputCGImage in
+            guard let inputCGImage else { return }
             
             // Convert to UIImage ONLY if you need UI display
-            let uiImage = UIImage(cgImage: cg)
+            let uiImage = UIImage(cgImage: inputCGImage)
             self.capturedImage = uiImage
 
             // Reset previous results
@@ -158,7 +158,7 @@ struct ScannerView: View {
             debugInfo.reset()
 
             // Call analyzer
-            analyzeStrip(image: uiImage, debug: debugInfo) { results in
+            analyzeStrip(capturedCGImage: inputCGImage, debug: debugInfo) { results in
                 self.barResults = results
             }
         }
