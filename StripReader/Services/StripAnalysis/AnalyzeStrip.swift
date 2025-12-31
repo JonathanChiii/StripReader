@@ -11,7 +11,7 @@ import SwiftUI
 func analyzeStrip(capturedCGImage: CGImage, debug: AnalyzerDebug? = nil, completion: @escaping ([BarResult]) -> Void) {
 
     debug?.reset()
-    debug?.add(label: "Input Image", image: UIImage(cgImage: capturedCGImage))
+    //debug?.add(label: "Input Image", image: UIImage(cgImage: capturedCGImage))
 
     detectStripRectangle(from: capturedCGImage) { rectCGImage in
         guard let rectCGImage else {
@@ -20,9 +20,8 @@ func analyzeStrip(capturedCGImage: CGImage, debug: AnalyzerDebug? = nil, complet
         }
 
         debug?.add(label: "Detected Strip (Perspective Corrected)", image: UIImage(cgImage: rectCGImage))
-        print("Detected Strip (Perspective Corrected)")
 
-        guard let croppedMiddleCGImage = cropMiddle(of: rectCGImage, divider: 5) else {
+        guard let croppedMiddleCGImage = cropMiddle(of: rectCGImage, divider: 5.7) else {
             completion([])
             return
         }

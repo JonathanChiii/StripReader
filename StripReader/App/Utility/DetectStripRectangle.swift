@@ -120,9 +120,9 @@ func cropRectangle(_ rect: VNRectangleObservation,
     let correctedCG = ctx.createCGImage(corrected, from: corrected.extent)!
 
     // Ensure strip is vertical (height > width)
-    if correctedCG.height < correctedCG.width {
-        return correctedCG.rotated90Degrees()
-    }
+//    if correctedCG.height < correctedCG.width {
+//        return correctedCG.rotated90Degrees()
+//    }
     return correctedCG
 }
 
