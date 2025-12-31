@@ -7,31 +7,28 @@
 
 import Vision
 import UIKit
+import CoreImage
 
-func detectStripRectangle(from image: UIImage, completion: @escaping (CGImage?) -> Void) {
-    guard let cgImage = image.cgImage else {
-        completion(nil)
-        return
-    }
+func detectStripRectangle(from cgInput: CGImage,
+                          completion: @escaping (CGImage?) -> Void) {
+    
+    // 1. Convert CGImage → CIImage so we can blur
+    let ciImage = CIImage(cgImage: cgInput)
 
-    // Convert to CIImage
-    let ciImage = CIImage(cgImage: cgImage)
+    // 2. Light blur to help rectangle detection
+    let blurred = ciImage.applyingFilter("CIGaussianBlur",
+                                         parameters: ["inputRadius": 3])
 
-    let blurred = ciImage
-        .applyingFilter("CIGaussianBlur", parameters: ["inputRadius": 3])
-    let ctx = CIContext()
-        guard let blurredCG = ctx.createCGImage(blurred, from: blurred.extent) else {
-            completion(nil)
-            return
-        }
-    let visionImageSize = CGSize(width: blurredCG.width, height: blurredCG.height)
-
-    // Convert blurred CIImage --> CGImage for Vision
+    // 3. Convert back to CGImage ONCE
     let context = CIContext()
     guard let blurredCG = context.createCGImage(blurred, from: blurred.extent) else {
         completion(nil)
         return
     }
+
+    let visionSize = CGSize(width: blurredCG.width, height: blurredCG.height)
+
+    // 4. Set up Vision rectangle detection
     let request = VNDetectRectanglesRequest { request, error in
         guard let rects = request.results as? [VNRectangleObservation],
               let best = rects.first else {
@@ -39,13 +36,21 @@ func detectStripRectangle(from image: UIImage, completion: @escaping (CGImage?) 
             return
         }
 
-        if let corrected = cropRectangle(best,from: cgImage, visionImageSize: visionImageSize) {
+        // 5. Perspective correct + crop the rectangle
+        if let corrected = cropRectangle(best, from: cgInput, visionImageSize: visionSize) {
             completion(corrected)
         } else {
             completion(nil)
         }
     }
 
+    // Rectangle tuning for tall, thin test strip
+//    request.minimumAspectRatio = 0.04        // allow narrow tall strip
+//    request.maximumAspectRatio = 0.15
+//    request.minimumSize = 0.03
+//    request.minimumConfidence = 0.55
+//    request.maximumObservations = 1
+//    request.quadratureTolerance = 45         // tolerate rotation & skew
 
     // Strip is tall, thin, high aspect ratio
     request.minimumAspectRatio = 0.05     // 1:20 ratio allowed
@@ -56,9 +61,11 @@ func detectStripRectangle(from image: UIImage, completion: @escaping (CGImage?) 
     request.quadratureTolerance = 45       // allow non-perfect right angles
     request.maximumObservations = 1        // expect one strip
     
-    let handler = VNImageRequestHandler(cgImage: blurredCG, options: [:])
+    // 6. Run Vision
+    let handler = VNImageRequestHandler(cgImage: blurredCG)
     try? handler.perform([request])
 }
+
 
 //func cropRectangle(_ rect: VNRectangleObservation, from cgImage: CGImage) -> CGImage? {
 //    let w = CGFloat(cgImage.width)
@@ -113,9 +120,9 @@ func cropRectangle(_ rect: VNRectangleObservation,
     let correctedCG = ctx.createCGImage(corrected, from: corrected.extent)!
 
     // Ensure strip is vertical (height > width)
-    if correctedCG.height < correctedCG.width {
-        return correctedCG.rotated90Degrees()
-    }
+//    if correctedCG.height < correctedCG.width {
+//        return correctedCG.rotated90Degrees()
+//    }
     return correctedCG
 }
 

@@ -8,13 +8,21 @@
 import Foundation
 import SwiftUI
 
-func cropMiddleFifth(of cgImage: CGImage) -> CGImage? {
-    let width = cgImage.width
-    let height = cgImage.height
+func cropMiddle(of cgImage: CGImage, divider number: Float) -> CGImage? {
+    let width = Float(cgImage.width)
+    let height = Float(cgImage.height)
 
-    let bandHeight = height / 5
-    let y = (height - bandHeight) / 2   // vertical center
+    let newHeight = height / 3
+    let startY = (height - newHeight) / 2
+    
+    let newWidth = width / number
+    let startX = (width - newWidth) / 2
 
-    let rect = CGRect(x: 0, y: y, width: width, height: bandHeight)
+    let rect = CGRect(x: CGFloat(startX),
+                      y: CGFloat(startY),
+                      width: CGFloat(newWidth),
+                      height: CGFloat(newHeight))
+
     return cgImage.cropping(to: rect)
 }
+

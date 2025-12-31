@@ -8,27 +8,28 @@
 import Foundation
 import SwiftUI
 
-func analyzeStrip(image: UIImage, debug: AnalyzerDebug? = nil, completion: @escaping ([BarResult]) -> Void) {
+func analyzeStrip(capturedCGImage: CGImage, debug: AnalyzerDebug? = nil, completion: @escaping ([BarResult]) -> Void) {
 
     debug?.reset()
-    debug?.add(label: "Input Image", image: image)
+    //debug?.add(label: "Input Image", image: UIImage(cgImage: capturedCGImage))
 
-    detectStripRectangle(from: image) { rectImage in
-        guard let rectImage else {
+    detectStripRectangle(from: capturedCGImage) { rectCGImage in
+        guard let rectCGImage else {
             completion([])
             return
         }
 
-        debug?.add(label: "Detected Strip (Perspective Corrected)", image: UIImage(cgImage: rectImage))
-        print("Detected Strip (Perspective Corrected)")
-        guard let middle = cropMiddleFifth(of: rectImage) else {
+        debug?.add(label: "Detected Strip (Perspective Corrected)", image: UIImage(cgImage: rectCGImage))
+
+        guard let croppedMiddleCGImage = cropMiddle(of: rectCGImage, divider: 5.7) else {
             completion([])
             return
         }
-        debug?.add(label: "Middle 1/5 Region", image: UIImage(cgImage: middle))
-        print("Middle 1/5 Cropped")
+
+        debug?.add(label: "Middle Region with bars", image: UIImage(cgImage: croppedMiddleCGImage))
+        print("Middle Cropped")
         // redness / saturation bar detection
-        let results = analyzeBarsInCroppedStrip(cgImage: middle, debug: debug)
+        let results = analyzeBarsInCroppedStrip(cgImage: croppedMiddleCGImage, debug: debug)
 //        let results = [
 //            BarResult(index: 1, intensity: 0.25, color: .red),
 //            BarResult(index: 2, intensity: 0.55, color: .green),
@@ -37,3 +38,4 @@ func analyzeStrip(image: UIImage, debug: AnalyzerDebug? = nil, completion: @esca
         completion(results)
     }
 }
+

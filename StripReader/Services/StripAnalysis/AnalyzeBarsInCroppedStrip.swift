@@ -13,7 +13,7 @@ func analyzeBarsInCroppedStrip(cgImage: CGImage, debug: AnalyzerDebug? = nil) ->
     debug?.add(label: "Input to Pink Analyzer", image: UIImage(cgImage: cgImage))
 
     // 1. Compute redness per column (pink signal)
-    let redValues = computeColumnBrightness(from: cgImage)
+    let redValues = computeColumnColorScore(from: cgImage, colorFunction: 1)
 
     debug?.add(label: "Raw Redness Graph", image:rednessGraphImage(redValues))
 
@@ -44,6 +44,19 @@ func analyzeBarsInCroppedStrip(cgImage: CGImage, debug: AnalyzerDebug? = nil) ->
 
     return results
 }
+
+func forceConvertToCGImage(_ image: UIImage) -> CGImage? {
+    let size = image.size
+    let rect = CGRect(origin: .zero, size: size)
+
+    UIGraphicsBeginImageContextWithOptions(size, false, image.scale)
+    image.draw(in: rect)
+    let newImage = UIGraphicsGetImageFromCurrentImageContext()
+    UIGraphicsEndImageContext()
+
+    return newImage?.cgImage
+}
+
 
 //func analyzeBarsInCroppedStrip(cgImage: CGImage,
 //                               debug: AnalyzerDebug? = nil) -> [BarResult] {

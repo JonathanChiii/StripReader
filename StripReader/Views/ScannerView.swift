@@ -48,10 +48,11 @@ struct ScannerView: View {
     
     @State private var capturedImage: UIImage?
     //@State private var capturedImage: UIImage? = UIImage(named: "test_strip")
-    @State private var barResult: [BarResult] = []
+    @State private var barResults: [BarResult] = []
     @State var debugInfo = AnalyzerDebug()
-    @State private var showCamera = false
-    //@StateObject private var cameraService = CameraService()
+    @State private var showCamera = true
+    @State private var showResult = false
+    @StateObject private var cameraService = CameraService()
 
     
     var body: some View {
@@ -59,6 +60,8 @@ struct ScannerView: View {
             Group {
                 // if image captured, display the scanned image and result
                 if let uiImage = self.capturedImage {
+                    
+                    // Display the scanned image
                     Image(uiImage: uiImage)
                         .resizable()
                         .scaledToFill()
@@ -69,9 +72,10 @@ struct ScannerView: View {
                             .stroke(.gray.opacity(self.standard_opacity), lineWidth: self.overlay_line_width)
                         )
                     
-                    // Result display
+                    // Display the results
                     VStack(alignment: .leading, spacing: self.h_stack_spacing) {
                         if enableDebug && !debugInfo.stages.isEmpty {
+                            // Display the statistics of each debug stage in a scroll view
                             ScrollView {
                                 ForEach(debugInfo.stages) { stage in
                                     VStack(alignment: .leading) {
@@ -87,12 +91,13 @@ struct ScannerView: View {
                             .frame(height: 200)
                         }
                         
-                        Text("Results")
+                        // Display the final results
+                        Text("Analyzed Result:")
                             .font(.headline)
                             .padding(.horizontal)
 
-                        if !self.barResult.isEmpty {
-                            List(self.barResult) { bar in
+                        if !self.barResults.isEmpty {
+                            List(self.barResults) { bar in
                                 HStack {
                                     Text("Bar \(bar.index)")
                                     Spacer()
@@ -110,39 +115,28 @@ struct ScannerView: View {
                     .frame(maxWidth: self.results_frame_max_width, maxHeight: self.results_frame_max_height)
                     
                         //.padding(.top, 0)
-                } else { // if image not captured, display the instruction frame
+                } else { // if image not captured, display the live camera preview with instruction frame
                     ZStack {
-                        RoundedRectangle(cornerRadius: self.standard_corner_radius)
-                            .stroke(.orange, style: StrokeStyle(lineWidth: self.frame_line_width, dash: [self.frame_dash_segment]))
-                            .foregroundStyle(.gray.opacity(self.standard_opacity))
-                        
-                        Text("Align test strip in the frame \n then tap the shutter to scan")
-                            .bold()
-                            .lineSpacing(self.text_line_space)
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.secondary)
-                            .padding()
+                        CameraPreview(session: cameraService.session)
+                            .clipShape(RoundedRectangle(cornerRadius: standard_corner_radius))
+                        GuideOverlay()
                     }
-                    .frame(width: self.text_frame_width, height: self.text_frame_height)
+                    .frame(height: 630)
                 }
             }
-            .padding(.top, 0)
-            //.padding(.horizontal)
-            
-            
-
-            
+            //.padding(.top, 0)
+            .padding(.horizontal)
             
             // Shutter Button
             Button {
                 if self.capturedImage != nil {
                     // clear current image and start a new scan
                     self.capturedImage = nil
-                    self.barResult = []
+                    self.barResults = []
+                    self.showResult = false
+                } else {
+                    cameraService.capture()
                 }
-                self.showCamera = true
-                
-
             } label: {
                 Image(systemName: self.capturedImage == nil ? "camera.circle.fill" : "xmark.circle.fill")
                     .resizable()
@@ -152,30 +146,57 @@ struct ScannerView: View {
             }
             .padding(.bottom, self.icon_pedding)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .sheet(isPresented: $showCamera) {
-            ImagePicker(image: $capturedImage) {
+        .onReceive(cameraService.$capturedImage) { inputCGImage in
+            guard let inputCGImage else { return }
+            
+            // Convert to UIImage ONLY if you need UI display
+            let uiImage = UIImage(cgImage: inputCGImage, scale: UIScreen.main.scale, orientation: .right)
+            self.capturedImage = uiImage
 
-                if let img = capturedImage {
-                    
-                    // Reset previous results
-                    barResult = []
-                    debugInfo.reset()
+            // Reset previous results
+            barResults = []
+            debugInfo.reset()
 
-                    // Call the Vision-based analyzer
-                    analyzeStrip(image: img, debug: debugInfo) { results in
-                        DispatchQueue.main.async {
-                            self.barResult = results
-                        }
-                    }
-                }
+            // Call analyzer
+            analyzeStrip(capturedCGImage: inputCGImage, debug: debugInfo) { results in
+                self.barResults = results
             }
-            Text("Image Picker")
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
     
     
 }
+
+struct GuideOverlay: View {
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let height = geo.size.height
+
+            ZStack {
+                // Vertical rails
+                Path { path in
+                    let railOffset = width * 0.47
+                    path.move(to: CGPoint(x: railOffset, y: 0))
+                    path.addLine(to: CGPoint(x: railOffset, y: height))
+                    path.move(to: CGPoint(x: width - railOffset, y: 0))
+                    path.addLine(to: CGPoint(x: width - railOffset, y: height))
+                }
+                .stroke(.green.opacity(0.6), lineWidth: 2)
+
+                // Center band (where bars should be)
+                Rectangle()
+                    .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8]))
+                    .foregroundColor(.green.opacity(0.6))
+                    .frame(height: height * 0.35)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+
 
 #Preview {
     ScannerView()
