@@ -40,7 +40,11 @@ final class CameraService: NSObject, ObservableObject {
         )
 
         guard
-            let device = discovery.devices.first,
+            let device = AVCaptureDevice.default(.builtInWideAngleCamera,
+                                                             for: .video,
+                                                             position: .back),
+            //let device = discovery.devices.first,
+            // uncomment this line if want to use the ultra wide camera digital zoom
             let input = try? AVCaptureDeviceInput(device: device),
             session.canAddInput(input)
         else {
@@ -55,11 +59,11 @@ final class CameraService: NSObject, ObservableObject {
             session.commitConfiguration()
             return
         }
-        setZoomFactor(2.0)
         session.addOutput(output)
 
         session.commitConfiguration()
         session.startRunning()
+        setZoomFactor(3.0)
     }
 
     /// Call this whenever you want to change zoom (e.g. default, or slider later).

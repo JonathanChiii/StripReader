@@ -1,3 +1,11 @@
+//
+//  Concentration.swift
+//  StripReader
+//
+//  Created by jOnAtHaN Chi on 1/7/26.
+//
+
+
 enum Concentration: String, CaseIterable, Identifiable {
     case mg1 = "1 mg/mL"
     case mg0_1 = "0.1 mg/mL"
