@@ -46,7 +46,7 @@ func computeColumnColorScore(from cgImage: CGImage, colorFunction i: Int) -> [CG
 
         colorScores[x] = total / CGFloat(height)
     }
-    print("Color Score: \(colorScores)")
+    //print("Color Score: \(colorScores)")
     return colorScores
 }
 

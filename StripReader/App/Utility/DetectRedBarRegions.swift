@@ -7,15 +7,6 @@
 
 import Foundation
 
-struct BarRegion {
-    let index: Int
-    let start: Int
-    let end: Int
-    var range: ClosedRange<Int> {
-            return start...end
-        }
-}
-
 // trough detection
 //func detectRedBarRegions(from values: [CGFloat]) -> [BarRegion] {
 //    // Compute mean & standard deviation

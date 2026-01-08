@@ -101,7 +101,12 @@ struct ScannerView: View {
                                 HStack {
                                     Text("Bar \(bar.index)")
                                     Spacer()
-                                    Text(String(format: "Color Intensity: %.2f", bar.intensity))
+                                    if(bar.detected) {
+                                        Text("Y")
+                                    } else {
+                                        Text("N")
+                                    }
+                                    Text(String(format: "Intensity: %.4f", bar.intensity))
                                     
                                     Rectangle()
                                         .fill(Color(bar.color))
