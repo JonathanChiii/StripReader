@@ -16,6 +16,8 @@ final class CameraService: NSObject, ObservableObject {
 
     @Published var capturedImage: CGImage?
 
+    private var videoDevice: AVCaptureDevice?
+
     override init() {
         super.init()
         configure()
@@ -25,10 +27,20 @@ final class CameraService: NSObject, ObservableObject {
         session.beginConfiguration()
         session.sessionPreset = .photo
 
+        // Prefer higher-quality back cameras when available
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [
+                .builtInTripleCamera,
+                .builtInDualCamera,
+                .builtInTelephotoCamera,
+                .builtInWideAngleCamera
+            ],
+            mediaType: .video,
+            position: .back
+        )
+
         guard
-            let device = AVCaptureDevice.default(.builtInWideAngleCamera,
-                                                 for: .video,
-                                                 position: .back),
+            let device = discovery.devices.first,
             let input = try? AVCaptureDeviceInput(device: device),
             session.canAddInput(input)
         else {
@@ -36,17 +48,34 @@ final class CameraService: NSObject, ObservableObject {
             return
         }
 
+        self.videoDevice = device
         session.addInput(input)
 
         guard session.canAddOutput(output) else {
             session.commitConfiguration()
             return
         }
-
+        setZoomFactor(2.0)
         session.addOutput(output)
 
         session.commitConfiguration()
         session.startRunning()
+    }
+
+    /// Call this whenever you want to change zoom (e.g. default, or slider later).
+    func setZoomFactor(_ factor: CGFloat) {
+        guard let device = videoDevice else { return }
+
+        let clamped = min(max(factor, device.minAvailableVideoZoomFactor),
+                          device.maxAvailableVideoZoomFactor)
+
+        do {
+            try device.lockForConfiguration()
+            device.videoZoomFactor = clamped
+            device.unlockForConfiguration()
+        } catch {
+            print("⚠️ Failed to set zoom: \(error)")
+        }
     }
 
     func capture() {
