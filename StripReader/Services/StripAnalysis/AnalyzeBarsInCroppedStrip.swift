@@ -30,33 +30,37 @@ func analyzeBarsInCroppedStrip(cgImage: CGImage, debug: AnalyzerDebug? = nil) ->
                image: drawRegionsOnGraph(values: smoothValues, regions: regions)
     )
 
+    let results = buildBarResults(
+            smoothValues: smoothValues,
+            regions: regions)
+    print("BuilsBarResults size: \(results.count)")
     // 4. Produce BarResult entries
-    var results: [BarResult] = []
-
-    let signalCount = max(1, smoothValues.count - 1)
-
-    for region in regions {
-
-        let intensity = averageIntensity(values: smoothValues, in: region.range)
-        let uiColor = UIColor(
-            red: intensity,
-            green: 0.4,
-            blue: 0.6,
-            alpha: 1.0
-        )
-
-        let centerFrac = region.center / CGFloat(signalCount)
-
-        results.append(
-            BarResult(
-                index: region.index,
-                intensity: intensity,
-                color: uiColor,
-                centerFrac: centerFrac,
-                detected: true
-            )
-        )
-    }
+//    var results: [BarResult] = []
+//
+//    let signalCount = max(1, smoothValues.count - 1)
+//
+//    for region in regions {
+//
+//        let intensity = averageIntensity(values: smoothValues, in: region.range)
+//        let uiColor = UIColor(
+//            red: intensity,
+//            green: 0.4,
+//            blue: 0.6,
+//            alpha: 1.0
+//        )
+//
+//        let centerFrac = region.center / CGFloat(signalCount)
+//
+//        results.append(
+//            BarResult(
+//                index: region.index,
+//                intensity: intensity,
+//                color: uiColor,
+//                centerFrac: centerFrac,
+//                detected: true
+//            )
+//        )
+//    }
 
     print("Scanned Result: \(results)")
     return results

@@ -49,6 +49,7 @@ struct ScannerView: View {
     @State private var capturedImage: UIImage?
     //@State private var capturedImage: UIImage? = UIImage(named: "test_strip")
     @State private var barResults: [BarResult] = []
+    @State private var prediction: Prediction?
     @State var debugInfo = AnalyzerDebug()
     @State private var showCamera = true
     @State private var showResult = false
@@ -116,6 +117,25 @@ struct ScannerView: View {
                             }
                             .listStyle(.plain)
                         }
+                        
+                        // Display the prediction
+                        if let prediction {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Predicted: \(prediction.concentration.rawValue)")
+                                    .font(.title2)
+
+                                Text("Confidence: \(Int(prediction.confidence * 100))%")
+                                    .foregroundStyle(.secondary)
+
+                                if AppConfig.isDebug {
+                                    Text("Reason: \(prediction.reason)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+
                     }
                     .frame(maxWidth: self.results_frame_max_width, maxHeight: self.results_frame_max_height)
                     
@@ -160,11 +180,15 @@ struct ScannerView: View {
 
             // Reset previous results
             barResults = []
+            prediction = nil
             debugInfo.reset()
 
             // Call analyzer
             analyzeStrip(capturedCGImage: inputCGImage, debug: debugInfo) { results in
-                self.barResults = results
+                DispatchQueue.main.async {
+                    self.barResults = results
+                    self.prediction = predictConcentration(from: results)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
