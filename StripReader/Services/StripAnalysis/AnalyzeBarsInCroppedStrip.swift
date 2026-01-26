@@ -8,7 +8,7 @@
 import Foundation
 import CoreGraphics
 import SwiftUI
-func analyzeBarsInCroppedStrip(cgImage: CGImage, debug: AnalyzerDebug? = nil) -> [BarResult] {
+func analyzeBarsInCroppedStrip(cgImage: CGImage, debug: AnalyzerDebug? = nil) -> StripAnalysisResult {
 
     debug?.add(label: "Input to Pink Analyzer", image: UIImage(cgImage: cgImage))
 
@@ -34,6 +34,22 @@ func analyzeBarsInCroppedStrip(cgImage: CGImage, debug: AnalyzerDebug? = nil) ->
             smoothValues: smoothValues,
             regions: regions)
     print("BuilsBarResults size: \(results.count)")
+    
+    let baseline = computeBaseline(
+        values: smoothValues,
+        exclude: regions.map { $0.range }
+    )
+
+    let prediction = predictConcentration(
+        bars: results,
+        baseline: baseline
+    )
+    
+    return StripAnalysisResult(
+        bars: results,
+        baseline: baseline,
+        prediction: prediction
+    )
     // 4. Produce BarResult entries
 //    var results: [BarResult] = []
 //
@@ -61,9 +77,6 @@ func analyzeBarsInCroppedStrip(cgImage: CGImage, debug: AnalyzerDebug? = nil) ->
 //            )
 //        )
 //    }
-
-    print("Scanned Result: \(results)")
-    return results
 }
 
 func forceConvertToCGImage(_ image: UIImage) -> CGImage? {

@@ -184,11 +184,10 @@ struct ScannerView: View {
             debugInfo.reset()
 
             // Call analyzer
-            analyzeStrip(capturedCGImage: inputCGImage, debug: debugInfo) { results in
-                DispatchQueue.main.async {
-                    self.barResults = results
-                    self.prediction = predictConcentration(from: results)
-                }
+            analyzeStrip(capturedCGImage: inputCGImage, debug: debugInfo) { analysis in
+                guard let analysis else { return }
+                self.barResults = analysis.bars
+                self.prediction = analysis.prediction
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
