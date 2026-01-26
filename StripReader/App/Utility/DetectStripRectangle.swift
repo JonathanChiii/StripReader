@@ -44,20 +44,11 @@ func detectStripRectangle(from cgInput: CGImage,
         }
     }
 
-    // Rectangle tuning for tall, thin test strip
-//    request.minimumAspectRatio = 0.04        // allow narrow tall strip
-//    request.maximumAspectRatio = 0.15
-//    request.minimumSize = 0.03
-//    request.minimumConfidence = 0.55
-//    request.maximumObservations = 1
-//    request.quadratureTolerance = 45         // tolerate rotation & skew
-
-    // Strip is tall, thin, high aspect ratio
-    request.minimumAspectRatio = 0.05     // 1:20 ratio allowed
-    request.maximumAspectRatio = 0.07      // 1:12 ratio allowed
-    request.minimumSize = 0.05             // must occupy at least 5% of image
+    // 5. Adjustment for test strip aspect ratio
+    request.minimumAspectRatio = 0.9
+    request.maximumAspectRatio = 1.1
+    request.minimumSize = 0.4
     request.minimumConfidence = 0.7        // relax confidence
-    request.quadratureTolerance = 45      // allow slight rotation
     request.quadratureTolerance = 45       // allow non-perfect right angles
     request.maximumObservations = 1        // expect one strip
     
@@ -119,11 +110,8 @@ func cropRectangle(_ rect: VNRectangleObservation,
     let ctx = CIContext()
     let correctedCG = ctx.createCGImage(corrected, from: corrected.extent)!
 
-    // Ensure strip is vertical (height > width)
-//    if correctedCG.height < correctedCG.width {
-//        return correctedCG.rotated90Degrees()
-//    }
     return correctedCG
+    //return source
 }
 
 extension CGImage {

@@ -12,7 +12,7 @@ func cropMiddle(of cgImage: CGImage, divider number: Float) -> CGImage? {
     let width = Float(cgImage.width)
     let height = Float(cgImage.height)
 
-    let newHeight = height / 3
+    let newHeight = height / 21
     let startY = (height - newHeight) / 2
     
     let newWidth = width / number
