@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import Vision
 
 struct ScannerView: View {
     
@@ -143,9 +144,13 @@ struct ScannerView: View {
                 } else { // if image not captured, display the live camera preview with instruction frame
                     ZStack {
                         CameraPreview(session: cameraService.session)
-                            .clipShape(RoundedRectangle(cornerRadius: standard_corner_radius))
+
+                        if let rect = cameraService.detectedRectangle {
+                            RectangleOverlay(rect: rect)
+                        }
                         GuideOverlay()
                     }
+
                     .frame(height: 630)
                 }
             }
@@ -163,12 +168,13 @@ struct ScannerView: View {
                     cameraService.capture()
                 }
             } label: {
-                Image(systemName: self.capturedImage == nil ? "camera.circle.fill" : "xmark.circle.fill")
-                    .resizable()
-                    .frame(width: self.icon_width, height: self.icon_height)
-                    .foregroundStyle(capturedImage == nil ? .blue : .red)
-                    .shadow(radius: self.icon_shadow_radius)
+                Image(systemName: cameraService.detectedRectangle == nil
+                      ? "circle"
+                      : "circle.fill")
+                    .font(.system(size: 72))
+                    .foregroundColor(cameraService.detectedRectangle == nil ? .gray : .white)
             }
+            .disabled(cameraService.detectedRectangle == nil)
             .padding(.bottom, self.icon_pedding)
         }
         .onReceive(cameraService.$capturedImage) { inputCGImage in
@@ -224,7 +230,26 @@ struct GuideOverlay: View {
     }
 }
 
+struct RectangleOverlay: View {
 
+    let rect: DetectedRectangle
+
+    var body: some View {
+        GeometryReader { geo in
+            Path { path in
+                let r = rect.boundingBox
+
+                let x = r.origin.x * geo.size.width
+                let y = (1 - r.origin.y - r.height) * geo.size.height
+                let w = r.width * geo.size.width
+                let h = r.height * geo.size.height
+
+                path.addRect(CGRect(x: x, y: y, width: w, height: h))
+            }
+            .stroke(rect.confidence > 0.8 ? .green : .yellow, lineWidth: 3)
+        }
+    }
+}
 
 #Preview {
     ScannerView()

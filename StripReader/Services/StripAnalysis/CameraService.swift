@@ -1,22 +1,24 @@
-//
-//  CameraService.swift
-//  StripReader
-//
-//  Created by jOnAtHaN Chi on 12/22/25.
-//
-
 import AVFoundation
+import Vision
 import UIKit
 
+// ✅ Sendable value type (do NOT store VNRectangleObservation in @Published)
+struct DetectedRectangle: Sendable {
+    let boundingBox: CGRect
+    let confidence: Float
+}
+
 @MainActor
-final class CameraService: NSObject, ObservableObject {
+final class CameraService: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
 
     let session = AVCaptureSession()
-    private let output = AVCapturePhotoOutput()
+
+    private let photoOutput = AVCapturePhotoOutput()
+    private let videoOutput = AVCaptureVideoDataOutput()
+    private let visionQueue = DispatchQueue(label: "vision.queue")
 
     @Published var capturedImage: CGImage?
-
-    private var videoDevice: AVCaptureDevice?
+    @Published var detectedRectangle: DetectedRectangle?
 
     override init() {
         super.init()
@@ -27,24 +29,8 @@ final class CameraService: NSObject, ObservableObject {
         session.beginConfiguration()
         session.sessionPreset = .photo
 
-        // Prefer higher-quality back cameras when available
-        let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [
-                .builtInTripleCamera,
-                .builtInDualCamera,
-                .builtInTelephotoCamera,
-                .builtInWideAngleCamera
-            ],
-            mediaType: .video,
-            position: .back
-        )
-
         guard
-            let device = AVCaptureDevice.default(.builtInWideAngleCamera,
-                                                             for: .video,
-                                                             position: .back),
-            //let device = discovery.devices.first,
-            // uncomment this line if want to use the ultra wide camera digital zoom
+            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
             let input = try? AVCaptureDeviceInput(device: device),
             session.canAddInput(input)
         else {
@@ -52,56 +38,96 @@ final class CameraService: NSObject, ObservableObject {
             return
         }
 
-        self.videoDevice = device
         session.addInput(input)
 
-        guard session.canAddOutput(output) else {
-            session.commitConfiguration()
-            return
+        // Photo output
+        if session.canAddOutput(photoOutput) {
+            session.addOutput(photoOutput)
         }
-        session.addOutput(output)
+
+        // Video output for Vision
+        videoOutput.alwaysDiscardsLateVideoFrames = true
+        videoOutput.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+        ]
+        videoOutput.setSampleBufferDelegate(self, queue: visionQueue)
+
+        if session.canAddOutput(videoOutput) {
+            session.addOutput(videoOutput)
+        }
+
+        // Keep video orientation consistent
+        if let conn = videoOutput.connection(with: .video), conn.isVideoOrientationSupported {
+            conn.videoOrientation = .portrait
+        }
 
         session.commitConfiguration()
         session.startRunning()
-        setZoomFactor(3.0)
     }
 
-    /// Call this whenever you want to change zoom (e.g. default, or slider later).
-    func setZoomFactor(_ factor: CGFloat) {
-        guard let device = videoDevice else { return }
-
-        let clamped = min(max(factor, device.minAvailableVideoZoomFactor),
-                          device.maxAvailableVideoZoomFactor)
-
-        do {
-            try device.lockForConfiguration()
-            device.videoZoomFactor = clamped
-            device.unlockForConfiguration()
-        } catch {
-            print("⚠️ Failed to set zoom: \(error)")
-        }
-    }
-
+    // Your existing photo capture method can stay as-is.
     func capture() {
         let settings = AVCapturePhotoSettings()
-        output.capturePhoto(with: settings, delegate: self)
+        photoOutput.capturePhoto(with: settings, delegate: self)
     }
 }
 
-extension CameraService: AVCapturePhotoCaptureDelegate {
+// ✅ IMPORTANT: this extension MUST be at file scope (not nested),
+// and captureOutput MUST be an instance method (not static).
+extension CameraService: AVCaptureVideoDataOutputSampleBufferDelegate {
 
-    nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
-                                 didFinishProcessingPhoto photo: AVCapturePhoto,
-                                 error: Error?) {
+    nonisolated func captureOutput(_ output: AVCaptureOutput,
+                                   didOutput sampleBuffer: CMSampleBuffer,
+                                   from connection: AVCaptureConnection) {
 
-        guard
-            let data = photo.fileDataRepresentation(),
-            let image = UIImage(data: data),
-            let cg = image.cgImage
-        else { return }
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        Task { @MainActor in
-            self.capturedImage = cg
+        let request = VNDetectRectanglesRequest { [weak self] request, _ in
+            guard let self else { return }
+
+            guard let rect = (request.results as? [VNRectangleObservation])?.first else {
+                Task { @MainActor in
+                    self.detectedRectangle = nil
+                }
+                return
+            }
+
+            let box = rect.boundingBox
+            let aspect = box.width / box.height
+
+//            // ✅ Enforce square AFTER detection
+//            let squareTolerance: CGFloat = 0.1
+//            guard abs(aspect - 1.0) < squareTolerance else {
+//                Task { @MainActor in
+//                    self.detectedRectangle = nil
+//                }
+//                return
+//            }
+
+            // Optional size filter
+            let area = box.width * box.height
+            guard area > 0.05, area < 0.8 else { return }
+
+            let safeRect = DetectedRectangle(
+                boundingBox: box,
+                confidence: rect.confidence
+            )
+
+            Task { @MainActor in
+                self.detectedRectangle = safeRect
+            }
         }
+
+        request.maximumObservations = 1
+        request.minimumConfidence = 0.8
+        request.minimumAspectRatio = 0.3
+        request.maximumAspectRatio = 1.0
+        request.quadratureTolerance = 20
+
+        // Adjust orientation if needed (portrait back camera is commonly .right)
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer,
+                                            orientation: .right,
+                                            options: [:])
+        try? handler.perform([request])
     }
 }
