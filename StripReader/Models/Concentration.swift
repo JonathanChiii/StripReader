@@ -6,15 +6,15 @@
 //
 
 
-enum Concentration: String, CaseIterable, Identifiable {
-    case mg1   = "1 mg/mL"
-    case mg0_1 = "0.1 mg/mL"
-    case ug10  = "10 µg/mL"
-    case ug1   = "1 µg/mL"
-    case ug0_1 = "0.1 µg/mL"
-    case ng10  = "10 ng/mL"
-    case ng1   = "1 ng/mL"
-    case ng0   = "0 ng/mL (Control)"
+enum Concentration: String, Identifiable {
+    case ng0    = "0 µg/mL"
+    case ug0_1  = "0.1 µg/mL"
+    case ug1    = "1 µg/mL"
+    case ug10   = "10 µg/mL"
+    case ug100  = "100 µg/mL"
+    case mg1    = "1000 µg/mL"
+    case mg5    = "5000 µg/mL"
+    case error  = "error"
 
     var id: String { rawValue }
 }

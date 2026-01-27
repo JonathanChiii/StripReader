@@ -14,35 +14,157 @@ func predictConcentration(
 
     guard let f = extractFeatures(from: bars) else { return nil }
 
-    //STARTING thresholds — tune with your 5 groups
-    let weakT2 = f.t2n < 0.10
-    let weakT3 = f.t3n < 0.08
-
-    // Key disambiguation:
-    // weak lines + HIGH baseline => hook/high concentration
-    // weak lines + LOW baseline  => true negative
-    if weakT2 && weakT3 {
-        if baseline > 0.18 {
-            return Prediction(concentration: .mg1,
-                              confidence: 0.80,
-                              reason: "T2/T3 weak but baseline pinkness elevated (hook/high conc)")
+    let t2 = f.t2n
+    let t3 = f.t3n
+    let r  = f.ratio23
+    print("t2: \(t2), t3: \(t3), ratio t3/t2:\(r), basseline: \(baseline)")
+    var reason = ""
+    
+    if t2 > 0.90 {
+        reason =  "T2 very strong. "
+        if (t3 > 0.80) {
+            reason.append("T3 is also strong. ")
+            return Prediction(
+                concentration: .ug1,
+                confidence: 0.95,
+                reason: reason
+            )
+        } else if (t3 < 0.10) {
+            reason.append("T3 is barely visible. ")
+            return Prediction(
+                concentration: .ng0,
+                confidence: 0.95,
+                reason: reason
+            )
         } else {
-            return Prediction(concentration: .mg0_1,
-                              confidence: 0.90,
-                              reason: "T2/T3 weak and baseline low (true negative)")
+            reason.append("T3 middle saturation ")
+            return Prediction(
+                concentration: .ug0_1,
+                confidence: 0.95,
+                reason: reason
+            )
         }
+    } else if (t2 < t3) {
+        reason = "T3 stronger than t2"
+        if (t3 > 0.4) {
+            reason.append("T3 still strong")
+            return Prediction(
+                concentration: .ug10,
+                confidence: 0.95,
+                reason: reason
+            )
+        } else if (t3 < 0.1) {
+            reason.append("T3 is barely visible")
+            return Prediction(
+                concentration: .mg1,
+                confidence: 0.95,
+                reason: reason
+            )
+        } else if (t3 > 0.2) {
+            reason.append("T3 is weaker")
+            return Prediction(
+                concentration: .ug100,
+                confidence: 0.95,
+                reason: reason
+            )
+        } else {
+            reason = "L2 classification"
+            return Prediction(
+                concentration: .error,
+                confidence: 0.95,
+                reason: reason
+            )
+        }
+    } else if (t2 < 0.05 && t3 < 0.05) {
+        reason = "Both T1 and T2 absent"
+        return Prediction(
+            concentration: .mg5,
+            confidence: 0.95,
+            reason: reason
+        )
+    } else {
+        reason = "L1 classification"
+        return Prediction(
+            concentration: .error,
+            confidence: 0.95,
+            reason: reason
+        )
+    }
+    
+    
+    
+
+    // 1️⃣ High Consentration (5000 µg/mL)
+    if t2 < 0.05 && t3 < 0.05 && baseline < 0.12 {
+        return Prediction(
+            concentration: .mg5,
+            confidence: 0.95,
+            reason: "T2/T3 absent and baseline clean"
+        )
     }
 
-    // Otherwise use T2 as monotonic main axis
-    if f.t2n > 0.85 { return Prediction(concentration: .ng0, confidence: 0.80, reason: "T2 very strong") }
-    if f.t2n > 0.65 { return Prediction(concentration: .ng1,  confidence: 0.75, reason: "T2 strong") }
-    if f.t2n > 0.45 { return Prediction(concentration: .ng10,   confidence: 0.70, reason: "T2 medium") }
-    if f.t2n > 0.28 { return Prediction(concentration: .ug10, confidence: 0.65, reason: "T2 faint but present") }
+    // 2️⃣ VERY HIGH CONC (5000 µg/mL) — hook extreme
+    if t2 < 0.10 && t3 < 0.10 && baseline > 0.20 {
+        return Prediction(
+            concentration: .mg1,
+            confidence: 0.80,
+            reason: "Both test lines suppressed with high baseline (strong hook)"
+        )
+    }
 
-    // Very low region: distinguish ng10 vs ng1 using T3 presence
-    if f.t3n > 0.10 { return Prediction(concentration: .ng10, confidence: 0.60, reason: "T2 very faint, T3 still visible") }
-    return Prediction(concentration: .ng1, confidence: 0.55, reason: "T2 barely present, T3 nearly absent")
+    // 3️⃣ HIGH CONC (1000 µg/mL)
+    if t2 < 0.18 && t3 < 0.10 && baseline > 0.16 {
+        return Prediction(
+            concentration: .mg1,
+            confidence: 0.75,
+            reason: "Weak test lines with elevated baseline (hook)"
+        )
+    }
+
+    // 4️⃣ MID-HIGH (100 µg/mL)
+    if t2 > 0.35 && t3 < 0.25 && r < 0.8 {
+        return Prediction(
+            concentration: .ug100,
+            confidence: 0.80,
+            reason: "T2 still strong but T3 collapsing"
+        )
+    }
+
+    // 5️⃣ MID (10 µg/mL)
+    if t2 > 0.45 && t3 > 0.30 && r > 0.7 {
+        return Prediction(
+            concentration: .ug10,
+            confidence: 0.85,
+            reason: "T2/T3 both strong"
+        )
+    }
+
+    // 6️⃣ LOW (1 µg/mL)
+    if t2 > 0.20 && t3 > 0.25 {
+        return Prediction(
+            concentration: .ug1,
+            confidence: 0.75,
+            reason: "T3 dominant over T2"
+        )
+    }
+
+    // 7️⃣ VERY LOW (0.1 µg/mL)
+    if t2 > 0.10 {
+        return Prediction(
+            concentration: .ug0_1,
+            confidence: 0.65,
+            reason: "Faint T2 detected"
+        )
+    }
+
+    // Fallback (rare ambiguity)
+    return Prediction(
+        concentration: .ug1,
+        confidence: 0.50,
+        reason: "Ambiguous pattern"
+    )
 }
+
 
 
 struct Prediction {
